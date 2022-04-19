@@ -21,22 +21,38 @@ uint32_t altrom_start = 0x600000;
 uint32_t altram_enable = 0xfffe00;
 uint32_t altrom_enable = 0xfffe0e;
 
+#elif ROM
+
+const char* name = "DSTB1";
+//  start       end    
+//  finish with 0,0
+uint32_t altram_blocks[] = { 
+    0x400000,   0xb00000,
+    0xb40000,   0xc00000,
+    0,0
+};
+
+uint32_t rom_start =    0xe00000;
+uint32_t rom_size =     0x040000;
+
+uint32_t altrom_start = 0xb00000; // 0 to disable
+uint32_t altram_enable = 0xfffe00;
+uint32_t altrom_enable = 0xfffe0e;
+
 #else
 
 const char* name = "DSTB1";
 //  start       end    
 //  finish with 0,0
 uint32_t altram_blocks[] = { 
-    0x400000,   0x700000,
-    0x740000,   0x800000,
+    0x400000,   0xc00000,
     0,0
 };
 
 uint32_t rom_start =    0xe00000;
 uint32_t rom_size =     0x040000;
-// 0 to disable
-uint32_t altrom_start = 0x700000;
 
+uint32_t altrom_start = 0; // 0 to disable
 uint32_t altram_enable = 0xfffe00;
 uint32_t altrom_enable = 0xfffe0e;
 
@@ -66,24 +82,24 @@ short set_cookie() {
     cookiejar = (COOKJAR *)(Setexc(0x05A0/4,(const void (*)(void))-1));
     if( cookiejar ) {
         for( i=0 ; cookiejar[i].id ; i++ ) {
-            //printf("%x\n", cookiejar[i].id );
+            //printf("%x\r\n", cookiejar[i].id );
             if( cookiejar[i].id==cookie ) {
                 return 1;
             }
         }
         // not found, make it at offset i
         max = (int)cookiejar[i].value;
-        //printf("Maximum number of cookie entires=%d, in use=%d\n", max, i);
+        //printf("Maximum number of cookie entires=%d, in use=%d\r\n", max, i);
         if( max <= i ) {
             // no more room
-            printf( "Can't add any more cookies. Jar is full. Exiting.\n");
+            printf( "Can't add any more cookies. Jar is full. Exiting.\r\n");
             exit(20);
         }
 
         // allocate FRB RAM
         frb = (void*)Mxalloc(64*1024,0);
         if(!frb) {
-            printf("Unable to allocate 64kb STRAM for FRB. Exiting.\n");
+            printf("Unable to allocate 64kb STRAM for FRB. Exiting.\r\n");
         }
 
         cookiejar[i+1].id = 0x0;
@@ -92,7 +108,7 @@ short set_cookie() {
         cookiejar[i].value = (LONG)frb;
     }
     else {
-        printf("Cookiejar not available. Exiting\n");
+        printf("Cookiejar not available. Exiting\r\n");
         exit(10);
     }
     return 0;
@@ -107,7 +123,7 @@ void doverify() {
         val1 = (uint16_t*)(0xe00000+offset);
         val2 = (uint16_t*)(0xb00000+offset);
         if( *val1 != *val2 ) {
-            printf("Verification error at offset %x (%x:%x)\n", offset, *val1, *val2);
+            printf("Verification error at offset %x (%x:%x)\r\n", offset, *val1, *val2);
         }
     }
 }
@@ -125,19 +141,19 @@ int main( int argc, char *argv[] ) {
     /* first check if we can read first block, if so do nothing */
     rc = check_read_byte(altram_blocks[0]);
     if( rc ) {
-        printf("AltRAM already enabled. Exiting.\n");
+        printf("AltRAM already enabled. Exiting.\r\n");
         exit(1);
     }
 
     /* try to enable the board */
     rc = check_write_byte( altram_enable, 0xff);
     if( !rc ) {
-        printf("%s not detected. Exiting.\n", name);
+        printf("%s not detected. Exiting.\r\n", name);
         exit(2);
     }
     rc = check_read_byte(altram_blocks[0]);
     if( !rc ) {
-        printf("Failed to activate %s AltRAM. Exiting.\n", name);
+        printf("Failed to activate %s AltRAM. Exiting.\r\n", name);
         exit(3);
     }
 
@@ -148,10 +164,10 @@ int main( int argc, char *argv[] ) {
 
         void *buf = memcpy( dst, src, (size_t)rom_size );
         if( !buf ) {
-            printf("memcpy() of TOS to AltRAM failed. Exiting.\n");
+            printf("memcpy() of TOS to AltRAM failed. Exiting.\r\n");
             exit(5);
         }
-        printf("Successfully copied TOS to SDRAM.\n");
+        printf("Successfully copied TOS to SDRAM.\r\n");
 
         /* enable TOS redirection */
         int redir_active = 0;
@@ -159,22 +175,22 @@ int main( int argc, char *argv[] ) {
         redir_active = check_write_byte( altrom_enable, 0xff);
 
         if( !redir_active ) {
-            printf("%s TOS redirection failed.\n", name);
+            printf("%s TOS redirection failed.\r\n", name);
         }
         else {
-            printf("%s TOS redirection active.\n", name);
+            printf("%s TOS redirection active.\r\n", name);
         }
     }
 
-    printf("Enabled %s AltRAM\n", name);
+    printf("Enabled %s AltRAM\r\n", name);
 
 
     has_cookie = set_cookie();
     if( has_cookie ) {
-        printf("_FRB cookie already set.\n");
+        printf("_FRB cookie already set.\r\n");
     }
     else {
-        printf( "_FRB cookie and 64kB DMA buffer allocated\n");
+        printf( "_FRB cookie and 64kB DMA buffer allocated\r\n");
     }
 
     /* register AltRAM */
@@ -187,7 +203,7 @@ int main( int argc, char *argv[] ) {
     }
     
     if( rc ) {
-        printf("Failed to allocate (all) AltRAM to the system pool. Exiting.\n");
+        printf("Failed to allocate (all) AltRAM to the system pool. Exiting.\r\n");
         exit(4);
     }
 
