@@ -69,14 +69,14 @@ typedef struct
 } COOKJAR;
 
 
-short set_cookie() {
+short set_cookie( void *frb ) {
     static WORD use_ssystem = -1;
     COOKJAR *cookiejar;
     LONG    val = -1l;
     int max;
     WORD    i=0;
     LONG cookie = '_FRB';
-    void *frb;
+/*    void *frb; */
 
     /* Get pointer to cookie jar */
     cookiejar = (COOKJAR *)(Setexc(0x05A0/4,(const void (*)(void))-1));
@@ -96,11 +96,6 @@ short set_cookie() {
             exit(20);
         }
 
-        // allocate FRB RAM
-        frb = (void*)Mxalloc(64*1024,0);
-        if(!frb) {
-            printf("Unable to allocate 64kb STRAM for FRB. Exiting.\r\n");
-        }
 
         cookiejar[i+1].id = 0x0;
         cookiejar[i+1].value = max;
@@ -133,7 +128,7 @@ int main( int argc, char *argv[] ) {
     int rc;
     char has_cookie;
     uint16_t value;
-
+    
     if( altram_blocks[0] == 0x0 || altram_blocks[1]-altram_blocks[0] == 0 ) { // no altram
         return 5;
     }
@@ -185,13 +180,16 @@ int main( int argc, char *argv[] ) {
     printf("Enabled %s AltRAM\r\n", name);
 
 
-    has_cookie = set_cookie();
+    // Use the RAM I (this program) was allocated as the FRB [hacky nasty]
+    has_cookie = set_cookie(_base->p_tbase);
     if( has_cookie ) {
         printf("_FRB cookie already set.\r\n");
     }
     else {
         printf( "_FRB cookie and 64kB DMA buffer allocated\r\n");
     }
+
+    long sizereq = 64000 + ( _base->p_tbase - _base->p_lowtpa );
 
     /* register AltRAM */
     
@@ -207,5 +205,6 @@ int main( int argc, char *argv[] ) {
         exit(4);
     }
 
-    return 0;
+    Ptermres( sizereq, rc);
+    return 99;
 }
