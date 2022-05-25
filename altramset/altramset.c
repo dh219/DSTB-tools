@@ -189,7 +189,7 @@ int main( int argc, char *argv[] ) {
         printf( "_FRB cookie and 64kB DMA buffer allocated\r\n");
     }
 
-    long sizereq = 64000 + ( _base->p_tbase - _base->p_lowtpa );
+    long sizereq = (64 * 1024) + ( _base->p_tbase - _base->p_lowtpa );
 
     /* register AltRAM */
     
