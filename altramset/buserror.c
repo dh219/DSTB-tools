@@ -21,7 +21,8 @@ void check_read_byte_real(void)
     void (*v_save)(void);
 
     available = true;
-    v_save = Setexc(2, exception_handler);
+    v_save = Setexc(2, -1L);
+    Setexc(2, exception_handler);
     if (!setjmp(env))
         value = * (volatile unsigned char *) address;
     Setexc(2, v_save);
@@ -33,7 +34,8 @@ void check_write_byte_real(void)
     void (*v_save)(void);
 
     available = true;
-    v_save = Setexc(2, exception_handler);
+    v_save = Setexc(2,-1);
+    Setexc(2, exception_handler);
     if (!setjmp(env))
         * (volatile unsigned char *) address = value;
     Setexc(2, v_save);

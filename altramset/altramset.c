@@ -157,7 +157,6 @@ int main( int argc, char *argv[] ) {
 
     printf("Enabled %s AltRAM\r\n", name);
 
-
     // Use the RAM I (this program) was allocated as the FRB and make sure it's 64k long
     has_cookie = set_cookie(_base->p_lowtpa);
     if( has_cookie ) {
@@ -167,7 +166,7 @@ int main( int argc, char *argv[] ) {
         printf( "_FRB cookie and 64kB DMA buffer allocated\r\n");
     }
 
-    long sizereq = (64 * 1024);
+    long sizereq = 100; //(64 * 1024);
 
     /* register AltRAM */
     
