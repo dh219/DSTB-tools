@@ -13,7 +13,7 @@ mhz16:
 	m68k-atari-mint-gcc $(OPT) -nostdlib -o dstb1_16.prg  -L$(LIBCMINI)/lib -I$(LIBCMINI)/include $(LIBCMINI)/lib/crt0.o  speed.c buserror.c -lcmini -lgcc
 
 mhz8:
-	m68k-atari-mint-gcc $(OPT) -nostdlib -o dstb1_8.prg  -L$(LIBCMINI)/lib -I$(LIBCMINI)/include $(LIBCMINI)/lib/crt0.o  speed.c buserror.c -lcmini -lgcc
+	m68k-atari-mint-gcc $(OPT) -nostdlib -o dstb1_8.prg  -L$(LIBCMINI)/lib -I$(LIBCMINI)/include $(LIBCMINI)/lib/crt0.o  speed.c buserror.c -lcmini -lgcc -DMHZ8
 
 
 clean:

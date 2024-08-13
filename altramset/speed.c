@@ -11,20 +11,12 @@ int main( int argc, char *argv[] ) {
     char *ptr;
     int mhz16 = 1;
 
-    if( argc < 1 || strlen( argv[0] ) == 0 )
-        exit(1);
-    
-    strncpy( fname, argv[0],sizeof(fname)-1);
-    fname[sizeof(fname)-1] = 0;
-    ptr = strstr( fname, ".");
-    if( ptr )
-        ptr[0] = 0; // filename without extension
-
-    if( fname[strlen(fname)-1] == '8' )
-        mhz16 = 0;
+#ifdef MHZ8
+    mhz16 = 0;
+#endif
 
     rc = check_read_byte( mhz16 ? enable16mhz : enable8mhz );
-    if( rc ) {
+    if( !rc ) {
         printf("DSTB1 not responding.\r\n");
         exit(2);
     }
