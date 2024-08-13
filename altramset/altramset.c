@@ -1,27 +1,6 @@
 #include "altramset.h"
 
-//#define EXXOS // comment in for EXXOS booster
-
-#ifdef EXXOS
-const char* name = "EXXOSRAM";
-
-//  start       end    
-//  finish with 0,0
-uint32_t altram_blocks[] = { 
-    0x400000,   0x600000,
-    0x640000,   0x800000,
-    0
-};
-
-uint32_t rom_start =    0xe00000;
-uint32_t rom_size =     0x040000;
-// 0 to disable
-uint32_t altrom_start = 0x600000;
-
-uint32_t altram_enable = 0xfffe00;
-uint32_t altrom_enable = 0xfffe0e;
-
-#elif ROM
+#ifdef ROM
 
 const char* name = "DSTB1";
 //  start       end    
@@ -36,8 +15,8 @@ uint32_t rom_start =    0xe00000;
 uint32_t rom_size =     0x040000;
 
 uint32_t altrom_start = 0xb00000; // 0 to disable
-uint32_t altram_enable = 0xfffe00;
-uint32_t altrom_enable = 0xfffe0e;
+uint32_t altram_enable = 0xfffe10;
+uint32_t altrom_enable = 0xfffe1e;
 
 #else
 
@@ -53,8 +32,8 @@ uint32_t rom_start =    0xe00000;
 uint32_t rom_size =     0x040000;
 
 uint32_t altrom_start = 0; // 0 to disable
-uint32_t altram_enable = 0xfffe00;
-uint32_t altrom_enable = 0xfffe0e;
+uint32_t altram_enable = 0xfffe10;
+uint32_t altrom_enable = 0xfffe1e;
 
 #endif
 
@@ -76,7 +55,6 @@ short set_cookie( void *frb ) {
     int max;
     WORD    i=0;
     LONG cookie = '_FRB';
-/*    void *frb; */
 
     /* Get pointer to cookie jar */
     cookiejar = (COOKJAR *)(Setexc(0x05A0/4,(const void (*)(void))-1));
@@ -180,8 +158,8 @@ int main( int argc, char *argv[] ) {
     printf("Enabled %s AltRAM\r\n", name);
 
 
-    // Use the RAM I (this program) was allocated as the FRB [hacky nasty]
-    has_cookie = set_cookie(_base->p_tbase);
+    // Use the RAM I (this program) was allocated as the FRB and make sure it's 64k long
+    has_cookie = set_cookie(_base->p_lowtpa);
     if( has_cookie ) {
         printf("_FRB cookie already set.\r\n");
     }
@@ -189,7 +167,7 @@ int main( int argc, char *argv[] ) {
         printf( "_FRB cookie and 64kB DMA buffer allocated\r\n");
     }
 
-    long sizereq = (64 * 1024) + ( _base->p_tbase - _base->p_lowtpa );
+    long sizereq = (64 * 1024);
 
     /* register AltRAM */
     
