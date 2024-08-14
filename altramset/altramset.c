@@ -38,8 +38,8 @@ uint32_t altrom_enable = 0xfffe1e;
 #endif
 
 
-
-
+volatile uint32_t *_memtop = (uint32_t*)0x436;
+uint32_t frbloc;
 
 typedef struct
 {
@@ -102,6 +102,12 @@ void doverify() {
 }
 */
 
+void finagle_memtop() {
+    uint32_t memtop_orig = *_memtop;
+    frbloc = (memtop_orig-(64*1024));
+    *_memtop = frbloc;
+}
+
 int main( int argc, char *argv[] ) {
     int rc;
     char has_cookie;
@@ -157,17 +163,6 @@ int main( int argc, char *argv[] ) {
 
     printf("Enabled %s AltRAM\r\n", name);
 
-    // Use the RAM I (this program) was allocated as the FRB and make sure it's 64k long
-    has_cookie = set_cookie(_base->p_lowtpa);
-    if( has_cookie ) {
-        printf("_FRB cookie already set.\r\n");
-    }
-    else {
-        printf( "_FRB cookie and 64kB DMA buffer allocated\r\n");
-    }
-
-    long sizereq = 100; //(64 * 1024);
-
     /* register AltRAM */
     
     int i;
@@ -182,6 +177,14 @@ int main( int argc, char *argv[] ) {
         exit(4);
     }
 
-    Ptermres( sizereq, rc);
-    return 99;
+    Supexec( finagle_memtop );
+    has_cookie = set_cookie( (void*)frbloc );
+    if( has_cookie ) {
+        printf("_FRB cookie already set.\r\n");
+    }
+    else {
+        printf( "_FRB cookie and 64kB DMA buffer allocated at %lx\r\n", frbloc );
+    }
+
+    return 0;
 }
