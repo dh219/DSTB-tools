@@ -3,9 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#ifndef __linux__
 #include <osbind.h>
-#endif
 
 #define TRUE 1
 #define FALSE 0

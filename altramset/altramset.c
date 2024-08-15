@@ -7,7 +7,7 @@ const char* name = "DSTB1";
 //  finish with 0,0
 uint32_t altram_blocks[] = { 
     0x400000,   0xb00000,
-    0xb40000,   0xc00000,
+    0xb80000,   0xc00000,
     0,0
 };
 
@@ -17,6 +17,7 @@ uint32_t rom_size =     0x040000;
 uint32_t altrom_start = 0xb00000; // 0 to disable
 uint32_t altram_enable = 0xfffe10;
 uint32_t altrom_enable = 0xfffe1e;
+uint32_t altrom_check  = 0xfffe18;
 
 #else
 
@@ -87,20 +88,6 @@ short set_cookie( void *frb ) {
     return 0;
 }
 
-/*
-void doverify() {
-    uint32_t offset;
-    uint16_t *val1;
-    uint16_t *val2;
-    for( offset = 0x0 ; offset <= 0x080000 ; offset += 2 ) {
-        val1 = (uint16_t*)(0xe00000+offset);
-        val2 = (uint16_t*)(0xb00000+offset);
-        if( *val1 != *val2 ) {
-            printf("Verification error at offset %x (%x:%x)\r\n", offset, *val1, *val2);
-        }
-    }
-}
-*/
 
 void finagle_memtop() {
     uint32_t memtop_orig = *_memtop;
@@ -136,30 +123,73 @@ int main( int argc, char *argv[] ) {
         exit(3);
     }
 
-    if( altrom_start > 0 ) {
-        /* copy TOS to RAM -- 256k at E00000 for TOS 2.06 */
-        uint16_t *src =    (uint16_t*)rom_start;
-        uint16_t *dst =    (uint16_t*)altrom_start;
+#ifdef ROM
 
-        void *buf = memcpy( dst, src, (size_t)rom_size );
-        if( !buf ) {
-            printf("memcpy() of TOS to AltRAM failed. Exiting.\r\n");
-            exit(5);
+    short do_redir = 1;
+
+    /* first we check if AltROM is already enabled */
+    rc = check_read_byte( altrom_check );
+    if( rc ) {
+        printf("AltROM already running. Skipping to Maddalt()\r\n");
+        do_redir = 0;
+    }
+
+    if( !rc && altrom_start > 0 ) {
+        short softrom = 0;
+        /* do we have a soft ROM? */
+        const char *romfname="\\dstb1.rom";
+        FILE *from = NULL;
+        if( from = fopen(romfname,"rb") ) {
+            fseek(from, 0L, SEEK_END);
+            rom_size = ftell(from);
+            rewind(from);
+            if( rom_size > 512*1024L ) {
+                printf("Soft ROM size too large (max 512k)\r\n");
+                fclose( from );
+                from = NULL;
+            }
         }
-        printf("Successfully copied TOS to SDRAM.\r\n");
+        if( from ) {
 
-        /* enable TOS redirection */
-        int redir_active = 0;
+            uint8_t *tmp;
+            tmp = malloc( 512*1024L );
+            if( !tmp )
+                exit(9);
+            uint32_t rc = fread( (uint16_t*)tmp, 1, rom_size, from );
 
-        redir_active = check_write_byte( altrom_enable, 0xff);
+            printf("rc=%ld rom_size=%ld\r\n", rc, rom_size);
+            memcpy( (uint16_t*)altrom_start, tmp, rom_size );
 
-        if( !redir_active ) {
-            printf("%s TOS redirection failed.\r\n", name);
+            if( rc == rom_size ) {
+                softrom = 1;
+                printf("Successfully copied %s to SDRAM.\r\n", romfname);
+            }
+            fclose( from );
+            from = NULL;
+            free(tmp);
         }
-        else {
-            printf("%s TOS redirection active.\r\n", name);
+
+        if( !softrom ) {
+            /* copy TOS to RAM -- 256k at E00000 for TOS 2.06 */
+            uint16_t *src =    (uint16_t*)rom_start;
+            uint16_t *dst =    (uint16_t*)altrom_start;
+
+            uint32_t test = 0xffffffff;
+            if( memcmp( src, &test, 4) == 0) {
+                printf("No OS found at 0xE00000 -- 192k ROMs not supported\r\n");
+                do_redir = 0;
+            }
+            else {
+                void *buf = memcpy( dst, src, (size_t)rom_size );
+                if( !buf ) {
+                    printf("memcpy() of TOS to AltRAM failed. Exiting.\r\n");
+                    exit(5);
+                }
+                printf("Successfully copied ROM to SDRAM.\r\n");
+            }
         }
     }
+#endif
 
     printf("Enabled %s AltRAM\r\n", name);
 
@@ -185,6 +215,27 @@ int main( int argc, char *argv[] ) {
     else {
         printf( "_FRB cookie and 64kB DMA buffer allocated at %lx\r\n", frbloc );
     }
+
+    sleep(1);
+
+#ifdef ROM
+    /* enable TOS redirection */
+    if( do_redir ) {
+        int redir_active = 0;
+
+        redir_active = check_write_byte( altrom_enable, 0xff);
+
+        if( redir_active ) {
+        //    __asm__ ( "jmp 0xE00000" );            
+            Setexc(2, (void*)0xE00000L );
+            *((uint16_t*)0x000000L) = 1;
+//            printf("%s TOS redirection active.\r\n", name);
+        }
+        else {
+            printf("%s TOS redirection failed.\r\n", name);
+        }
+    }
+#endif
 
     return 0;
 }
