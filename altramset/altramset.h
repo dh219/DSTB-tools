@@ -11,4 +11,6 @@
 typedef uint32_t LONG;
 typedef uint16_t WORD;
 
+extern uint32_t _PgmSize;
+
 int check_read_byte( long add );

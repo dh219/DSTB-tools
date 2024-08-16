@@ -40,7 +40,6 @@ uint32_t altrom_enable = 0xfffe1e;
 
 
 volatile uint32_t *_memtop = (uint32_t*)0x436;
-uint32_t frbloc;
 
 typedef struct
 {
@@ -89,16 +88,11 @@ short set_cookie( void *frb ) {
 }
 
 
-void finagle_memtop() {
-    uint32_t memtop_orig = *_memtop;
-    frbloc = (memtop_orig-(64*1024));
-    *_memtop = frbloc;
-}
-
 int main( int argc, char *argv[] ) {
     int rc;
     char has_cookie;
     uint16_t value;
+    uint8_t *frb = (uint8_t*)_base; // going back to using my basepage as teh FRB then reserve 64k on exit
     
     if( altram_blocks[0] == 0x0 || altram_blocks[1]-altram_blocks[0] == 0 ) { // no altram
         return 5;
@@ -207,16 +201,13 @@ int main( int argc, char *argv[] ) {
         exit(4);
     }
 
-    Supexec( finagle_memtop );
-    has_cookie = set_cookie( (void*)frbloc );
+    has_cookie = set_cookie( (void*)frb );
     if( has_cookie ) {
         printf("_FRB cookie already set.\r\n");
     }
     else {
-        printf( "_FRB cookie and 64kB DMA buffer allocated at %lx\r\n", frbloc );
+        printf( "_FRB cookie and 64kB DMA buffer\r\n allocated at %lx\r\n", frb );
     }
-
-    sleep(1);
 
 #ifdef ROM
     /* enable TOS redirection */
@@ -237,5 +228,11 @@ int main( int argc, char *argv[] ) {
     }
 #endif
 
-    return 0;
+    uint32_t reservation = 64*1024L;
+//    uint32_t reservation = _PgmSize;
+//    printf("Ptermres(%ld,%d)\r\n", reservation, rc );
+
+    sleep(1);
+    Ptermres( reservation, rc);
+    return 99;
 }
