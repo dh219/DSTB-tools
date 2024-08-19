@@ -93,7 +93,8 @@ int main( int argc, char *argv[] ) {
     char has_cookie;
     uint16_t value;
     uint8_t *frb = (uint8_t*)_base; // going back to using my basepage as teh FRB then reserve 64k on exit
-    
+    short go_res = 0;
+
     if( altram_blocks[0] == 0x0 || altram_blocks[1]-altram_blocks[0] == 0 ) { // no altram
         return 5;
     }
@@ -145,16 +146,25 @@ int main( int argc, char *argv[] ) {
         }
         if( from ) {
 
+#define BLOCK 16*1024L
             uint8_t *tmp;
-            tmp = malloc( 512*1024L );
-            if( !tmp )
-                exit(9);
-            uint32_t rc = fread( (uint16_t*)tmp, 1, rom_size, from );
+            tmp = malloc( BLOCK );
+            if( !tmp ) {
+                printf( "Insufficient memory for copy\r\n");
+                exit(9);                
+            }
+            uint32_t offset = 0;
+            uint32_t total=0;
+            while( offset < rom_size ) {
+                uint32_t dest = altrom_start + offset;
+                total += fread( (uint16_t*)tmp, 1, BLOCK, from );
+                memcpy( (uint16_t*)dest, tmp, rom_size );
+                offset += BLOCK;
+            }
 
-            printf("rc=%ld rom_size=%ld\r\n", rc, rom_size);
-            memcpy( (uint16_t*)altrom_start, tmp, rom_size );
+            printf("SoftROM copied. rom_size=%ld\r\n", rom_size);
 
-            if( rc == rom_size ) {
+            if( total == rom_size ) {
                 softrom = 1;
                 printf("Successfully copied %s to SDRAM.\r\n", romfname);
             }
@@ -197,30 +207,31 @@ int main( int argc, char *argv[] ) {
     }
     
     if( rc ) {
-        printf("Failed to allocate (all) AltRAM to the system pool. Exiting.\r\n");
-        exit(4);
-    }
-
-    has_cookie = set_cookie( (void*)frb );
-    if( has_cookie ) {
-        printf("_FRB cookie already set.\r\n");
+        printf("Failed to allocate (all) AltRAM to the system pool.\r\n");
     }
     else {
-        printf( "_FRB cookie and 64kB DMA buffer\r\n allocated at %lx\r\n", frb );
-    }
 
+        has_cookie = set_cookie( (void*)frb );
+        if( has_cookie ) {
+            printf("_FRB cookie already set.\r\n");
+        }
+        else {
+            printf( "_FRB cookie and 64kB DMA buffer\r\n allocated at %lx\r\n", frb );
+        }
+        go_res = 1;
+    }
 #ifdef ROM
     /* enable TOS redirection */
     if( do_redir ) {
         int redir_active = 0;
 
-        redir_active = check_write_byte( altrom_enable, 0xff);
+        redir_active = check_read_byte( altrom_enable);
 
         if( redir_active ) {
         //    __asm__ ( "jmp 0xE00000" );            
-            Setexc(2, (void*)0xE00000L );
-            *((uint16_t*)0x000000L) = 1;
-//            printf("%s TOS redirection active.\r\n", name);
+//            Setexc(2, (void*)0xE00000L );
+//            *((uint16_t*)0x000000L) = 1;
+            printf("%s TOS redirection active.\r\n", name);
         }
         else {
             printf("%s TOS redirection failed.\r\n", name);
@@ -233,6 +244,9 @@ int main( int argc, char *argv[] ) {
 //    printf("Ptermres(%ld,%d)\r\n", reservation, rc );
 
     sleep(1);
-    Ptermres( reservation, rc);
-    return 99;
+    if( go_res ) {
+        Ptermres( reservation, rc);
+        return 99;
+    }
+    return 0;
 }
