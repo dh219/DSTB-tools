@@ -99,7 +99,7 @@ int main( int argc, char *argv[] ) {
     if( altram_blocks[0] == 0x0 || altram_blocks[1]-altram_blocks[0] == 0 ) { // no altram
         return 5;
     }
-    
+
     /* first check if we can read first block, if so do nothing */
     rc = check_read_byte(altram_blocks[0]);
     if( rc ) {
@@ -109,7 +109,7 @@ int main( int argc, char *argv[] ) {
             printf("AltRAM already enabled. Exiting.\r\n");
             exit(1);
         }
-        printf("%s already enabled but AltRAM not declared. Skipping to Maddalt()\r\n");
+        printf("%s already enabled but AltRAM not declared. Skipping to Maddalt()\r\n", name);
     }
     else {
         
