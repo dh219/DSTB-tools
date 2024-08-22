@@ -94,6 +94,7 @@ int main( int argc, char *argv[] ) {
     uint16_t value;
     uint8_t *frb = (uint8_t*)_base; // going back to using my basepage as teh FRB then reserve 64k on exit
     short go_res = 0;
+    short do_redir = 1;
 
     if( altram_blocks[0] == 0x0 || altram_blocks[1]-altram_blocks[0] == 0 ) { // no altram
         return 5;
@@ -102,100 +103,105 @@ int main( int argc, char *argv[] ) {
     /* first check if we can read first block, if so do nothing */
     rc = check_read_byte(altram_blocks[0]);
     if( rc ) {
-        printf("AltRAM already enabled. Exiting.\r\n");
-        exit(1);
+        uint32_t block;
+        block = (uint32_t)Mxalloc( -1L, 1 );
+        if( block > 0 ) {
+            printf("AltRAM already enabled. Exiting.\r\n");
+            exit(1);
+        }
+        printf("%s already enabled but AltRAM not declared. Skipping to Maddalt()\r\n");
     }
-
-    /* try to enable the board */
-    rc = check_write_byte( altram_enable, 0xff);
-    if( !rc ) {
-        printf("%s not detected. Exiting.\r\n", name);
-        exit(2);
-    }
-    rc = check_read_byte(altram_blocks[0]);
-    if( !rc ) {
-        printf("Failed to activate %s AltRAM. Exiting.\r\n", name);
-        exit(3);
-    }
+    else {
+        
+        /* try to enable the board */
+        rc = check_write_byte( altram_enable, 0xff);
+        if( !rc ) {
+            printf("%s not detected. Exiting.\r\n", name);
+            exit(2);
+        }
+        rc = check_read_byte(altram_blocks[0]);
+        if( !rc ) {
+            printf("Failed to activate %s AltRAM. Exiting.\r\n", name);
+            exit(3);
+        }
+        printf("Enabled %s AltRAM\r\n", name);
 
 #ifdef ROM
 
-    short do_redir = 1;
 
-    /* first we check if AltROM is already enabled */
-    rc = check_read_byte( altrom_check );
-    if( rc ) {
-        printf("AltROM already running. Skipping to Maddalt()\r\n");
-        do_redir = 0;
-    }
+        /* first we check if AltROM is already enabled */
+        rc = check_read_byte( altrom_check );
+        if( rc ) {
+            printf("AltROM already running. Skipping to Maddalt()\r\n");
+            do_redir = 0;
+        }
 
-    if( !rc && altrom_start > 0 ) {
-        short softrom = 0;
-        /* do we have a soft ROM? */
-        const char *romfname="\\dstb1.rom";
-        FILE *from = NULL;
-        if( from = fopen(romfname,"rb") ) {
-            fseek(from, 0L, SEEK_END);
-            rom_size = ftell(from);
-            rewind(from);
-            if( rom_size > 512*1024L ) {
-                printf("Soft ROM size too large (max 512k)\r\n");
+        if( !rc && altrom_start > 0 ) {
+            short softrom = 0;
+            /* do we have a soft ROM? */
+            const char *romfname="\\dstb1.rom";
+            FILE *from = NULL;
+            if( from = fopen(romfname,"rb") ) {
+                fseek(from, 0L, SEEK_END);
+                rom_size = ftell(from);
+                rewind(from);
+                if( rom_size > 512*1024L ) {
+                    printf("Soft ROM size too large (max 512k)\r\n");
+                    fclose( from );
+                    from = NULL;
+                }
+            }
+            if( from ) {
+
+    #define BLOCK 16*1024L
+                uint8_t *tmp;
+                tmp = malloc( BLOCK );
+                if( !tmp ) {
+                    printf( "Insufficient memory for copy\r\n");
+                    exit(9);                
+                }
+                uint32_t offset = 0;
+                uint32_t total=0;
+                while( offset < rom_size ) {
+                    uint32_t dest = altrom_start + offset;
+                    total += fread( (uint16_t*)tmp, 1, BLOCK, from );
+                    memcpy( (uint16_t*)dest, tmp, rom_size );
+                    offset += BLOCK;
+                }
+
+                printf("SoftROM copied. rom_size=%ld\r\n", rom_size);
+
+                if( total == rom_size ) {
+                    softrom = 1;
+                    printf("Successfully copied %s to SDRAM.\r\n", romfname);
+                }
                 fclose( from );
                 from = NULL;
-            }
-        }
-        if( from ) {
-
-#define BLOCK 16*1024L
-            uint8_t *tmp;
-            tmp = malloc( BLOCK );
-            if( !tmp ) {
-                printf( "Insufficient memory for copy\r\n");
-                exit(9);                
-            }
-            uint32_t offset = 0;
-            uint32_t total=0;
-            while( offset < rom_size ) {
-                uint32_t dest = altrom_start + offset;
-                total += fread( (uint16_t*)tmp, 1, BLOCK, from );
-                memcpy( (uint16_t*)dest, tmp, rom_size );
-                offset += BLOCK;
+                free(tmp);
             }
 
-            printf("SoftROM copied. rom_size=%ld\r\n", rom_size);
+            if( !softrom ) {
+                /* copy TOS to RAM -- 256k at E00000 for TOS 2.06 */
+                uint16_t *src =    (uint16_t*)rom_start;
+                uint16_t *dst =    (uint16_t*)altrom_start;
 
-            if( total == rom_size ) {
-                softrom = 1;
-                printf("Successfully copied %s to SDRAM.\r\n", romfname);
-            }
-            fclose( from );
-            from = NULL;
-            free(tmp);
-        }
-
-        if( !softrom ) {
-            /* copy TOS to RAM -- 256k at E00000 for TOS 2.06 */
-            uint16_t *src =    (uint16_t*)rom_start;
-            uint16_t *dst =    (uint16_t*)altrom_start;
-
-            uint32_t test = 0xffffffff;
-            if( memcmp( src, &test, 4) == 0) {
-                printf("No OS found at 0xE00000 -- 192k ROMs not supported\r\n");
-                do_redir = 0;
-            }
-            else {
-                void *buf = memcpy( dst, src, (size_t)rom_size );
-                if( !buf ) {
-                    printf("memcpy() of TOS to AltRAM failed. Exiting.\r\n");
-                    exit(5);
+                uint32_t test = 0xffffffff;
+                if( memcmp( src, &test, 4) == 0) {
+                    printf("No OS found at 0xE00000 -- 192k ROMs not supported\r\n");
+                    do_redir = 0;
                 }
-                printf("Successfully copied ROM to SDRAM.\r\n");
+                else {
+                    void *buf = memcpy( dst, src, (size_t)rom_size );
+                    if( !buf ) {
+                        printf("memcpy() of TOS to AltRAM failed. Exiting.\r\n");
+                        exit(5);
+                    }
+                    printf("Successfully copied ROM to SDRAM.\r\n");
+                }
             }
         }
-    }
 #endif
-
-    printf("Enabled %s AltRAM\r\n", name);
+    }
 
     /* register AltRAM */
     
